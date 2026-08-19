@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.git/
+.env
+data/vector_store/
+database/*.db
+*.md
+!README.md
+tests/

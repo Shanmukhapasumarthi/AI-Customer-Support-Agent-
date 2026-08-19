@@ -1,0 +1,21 @@
+# --- Secrets: NEVER commit these --------------------------------------
+.env
+
+# --- Python -----------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# --- Generated artifacts ----------------------------------------------
+# The vector store is rebuilt from data/knowledge_base, so it is derived
+# data, not source. Same for the SQLite file (seeded by a script).
+data/vector_store/
+database/*.db
+
+# --- Editors / OS -----------------------------------------------------
+.vscode/
+.idea/
+.DS_Store

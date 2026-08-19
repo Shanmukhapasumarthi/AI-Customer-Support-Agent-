@@ -1,0 +1,36 @@
+# --- Core framework -------------------------------------------------------
+langchain==0.3.30
+langchain-core==0.3.86
+langchain-community==0.3.31
+langchain-text-splitters==0.3.11
+
+# --- LLM provider: Groq ---------------------------------------------------
+langchain-groq==0.3.8
+
+# --- Embeddings: run locally on CPU, no API cost --------------------------
+# sentence-transformers 3.4.1 caps transformers to the 4.x line, which is the
+# combination langchain-huggingface is tested against.
+langchain-huggingface==0.3.1
+sentence-transformers==3.4.1
+
+# --- Vector store ---------------------------------------------------------
+langchain-chroma
+chromadb
+
+# --- Backend API ----------------------------------------------------------
+fastapi
+uvicorn[standard]
+
+# --- Frontend -------------------------------------------------------------
+streamlit
+
+# --- Config + validation --------------------------------------------------
+pydantic
+pydantic-settings
+python-dotenv
+
+# --- HTTP client (Streamlit -> FastAPI) -----------------------------------
+requests
+
+# --- Testing --------------------------------------------------------------
+pytest

@@ -1,0 +1,84 @@
+# =============================================================================
+# Three services:
+#   init  - one-shot: builds the vector store and seeds the database, then exits
+#   api   - the FastAPI backend
+#   ui    - the Streamlit frontend
+#
+# Start everything:   docker compose up --build
+# Then open:          http://localhost:8501   (UI)
+#                     http://localhost:8000/docs   (API docs)
+#
+# WHY A SEPARATE `init` SERVICE?
+# Ingestion is a BUILD step, not a RUN step. If the API did it on startup, every
+# restart would stall for minutes and every replica would redundantly rebuild the
+# same index. Running it once as its own container, with the API waiting for it
+# to finish successfully, is the correct separation.
+# =============================================================================
+
+services:
+
+  init:
+    build: .
+    env_file: .env
+    # `python -c` rather than a shell script keeps it dependency-free.
+    command: >
+      python -c "
+      from scripts.ingest import ingest;
+      from scripts.seed_database import seed;
+      ingest();
+      seed();
+      print('Initialisation complete.')
+      "
+    volumes:
+      - vector_store:/app/data/vector_store
+      - database:/app/database
+      - hf_cache:/app/.cache/huggingface
+      # Bind-mount the knowledge base so editing a policy file on your machine
+      # and re-running `docker compose up init` picks up the change without a
+      # rebuild.
+      - ./data/knowledge_base:/app/data/knowledge_base:ro
+
+  api:
+    build: .
+    env_file: .env
+    ports:
+      - "8000:8000"
+    environment:
+      API_HOST: 0.0.0.0
+      API_PORT: "8000"
+    volumes:
+      - vector_store:/app/data/vector_store
+      - database:/app/database
+      - hf_cache:/app/.cache/huggingface
+      - ./data/knowledge_base:/app/data/knowledge_base:ro
+    depends_on:
+      init:
+        # Wait for init to EXIT SUCCESSFULLY, not merely to start. Without this
+        # the API would boot against an empty vector store and report degraded.
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  ui:
+    build: .
+    env_file: .env
+    ports:
+      - "8501:8501"
+    environment:
+      # Inside the compose network, services address each other by SERVICE NAME.
+      # "localhost" from the ui container would mean the ui container itself.
+      API_URL: http://api:8000
+    command: >
+      streamlit run frontend/streamlit_app.py
+      --server.port=8501
+      --server.address=0.0.0.0
+      --server.headless=true
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  # Named volumes persist across `docker compose down`. Without them you would
+  # re-embed the knowledge base on every single restart.
+  vector_store:
+  database:
+  hf_cache:

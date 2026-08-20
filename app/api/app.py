@@ -15,27 +15,14 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Startup and shutdown hooks.
 
-    Everything before `yield` runs once at startup; everything after runs at
-    shutdown. Warm-up failures are logged as warnings rather than raised: a
-    server that starts in a degraded state and says so via /health is more useful
-    than one that refuses to boot, especially in a container orchestrator.
+    LAZY-LOADING MODE: Everything before `yield` runs once at startup; everything
+    after runs at shutdown. We skip embedding and database warm-up to avoid OOM on
+    memory-constrained environments (e.g., Render free tier). These will load on
+    first use instead, making the first request slower but keeping startup fast.
     """
     setup_logging()
-    logger.info("Starting %s", settings.app_name)
-
-    try:
-        from app.rag.embeddings import get_embeddings
-        get_embeddings()  # cached from here on
-        logger.info("Embedding model warm.")
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("Embedding warm-up failed: %s", exc)
-
-    try:
-        from app.database.database import database_stats, init_database
-        init_database()
-        logger.info("Database rows: %s", database_stats())
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("Database warm-up failed: %s", exc)
+    logger.info("Starting %s (lazy-loading enabled)", settings.app_name)
+    logger.info("Embeddings and database will load on first request")
 
     yield
 

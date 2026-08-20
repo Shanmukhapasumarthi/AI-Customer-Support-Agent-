@@ -1,5 +1,7 @@
 from __future__ import annotations
+
 import logging
+
 from fastapi import APIRouter, HTTPException, status
 
 from app.agents.memory import clear_session, session_message_count
@@ -11,6 +13,46 @@ from app.schemas.response import ChatRequest, HealthResponse, SupportResponse
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# Lazy-loading flags to track if initialization has happened
+_embeddings_loaded = False
+_database_loaded = False
+
+
+def _ensure_embeddings_loaded() -> None:
+    """Load embeddings on first use (lazy-loading).
+
+    Called before chat endpoint to avoid loading during startup, which can cause
+    OOM on memory-constrained environments like Render's free tier.
+    """
+    global _embeddings_loaded
+    if _embeddings_loaded:
+        return
+
+    try:
+        from app.rag.embeddings import get_embeddings
+        get_embeddings()  # cached from here on
+        _embeddings_loaded = True
+        logger.info("Embedding model loaded on first request")
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Failed to load embeddings on first request")
+        raise
+
+
+def _ensure_database_loaded() -> None:
+    """Initialize database on first use (lazy-loading)."""
+    global _database_loaded
+    if _database_loaded:
+        return
+
+    try:
+        from app.database.database import init_database
+        init_database()
+        _database_loaded = True
+        logger.info("Database initialized on first request")
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Failed to initialize database on first request")
+        raise
 
 
 @router.get("/health", response_model=HealthResponse, tags=["system"])
@@ -64,12 +106,21 @@ def health() -> HealthResponse:
 def chat(request: ChatRequest) -> SupportResponse:
     """Main endpoint. Send a customer message, get a structured answer.
 
+    LAZY-LOADING: On the first request, this endpoint loads the embedding model
+    and initializes the database. This makes the first request slower (~30-60s)
+    but keeps the server startup fast on memory-constrained environments.
+
     Note there is no try/except returning a 500 here. `answer_question` already
     converts any internal failure into an escalated SupportResponse. A support
     product should degrade to "a human will help you" rather than to a 500 page.
     """
     logger.info("POST /chat session=%s message=%r",
                 request.session_id, request.message[:80])
+
+    # Lazy-load on first request
+    _ensure_embeddings_loaded()
+    _ensure_database_loaded()
+
     return answer_question(message=request.message, session_id=request.session_id)
 
 

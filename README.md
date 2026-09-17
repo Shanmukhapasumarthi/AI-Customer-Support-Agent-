@@ -1,6 +1,6 @@
 # AI Customer Support Knowledge Agent
 
-A production-style customer support agent built with **LangChain** — no LangGraph.
+A production-style customer support agent built with **LangChain** 
 It answers policy questions from a private knowledge base using RAG, calls tools
 against a live database for order and product lookups, remembers the
 conversation, returns validated structured output, and escalates to a human when
